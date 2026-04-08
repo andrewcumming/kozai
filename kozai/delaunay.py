@@ -44,7 +44,7 @@ class TripleDelaunay:
         quadrupole: Toggle the quadrupole term.
         octupole: Toggle the octupole term.
         hexadecapole: Toggle the hexadecapole term.
-        gr: Toggle GR effects.
+        gr, gr_precession, gr_radiation: Toggle GR effects, either all at once or individually
         algo: Set the integration algorithm (see the scipy.ode docs).
 
     """
@@ -91,6 +91,8 @@ class TripleDelaunay:
         self.octupole = True
         self.hexadecapole = False
         self.gr = False
+        self.gr_precession = False
+        self.gr_radiation = False
         self.algo = 'vode'
         self.maxoutput = int(1e6)
         self.collision = False
@@ -437,7 +439,7 @@ class TripleDelaunay:
 
         # Eq. 11 of Blaes et al. (2002).
         da1dt = 0.0
-        if self.gr:
+        if self.gr_radiation or self.gr:
             da1dt += -(
                 64 * G**3 * m1 * m2 * (m1 + m2) /
                 (5 * c**5 * a1**3 * sqrt((1 - e1**2)**7)) *
@@ -461,7 +463,7 @@ class TripleDelaunay:
                 (10 * th * (1 - th**2) * (1 - 3 * e1**2) * sing1 * sing2 +
                 cosphi * (3 * A - 10 * th**2 + 2))
             )
-        if self.gr:
+        if self.gr_precession or self.gr:
             dg1dt += ((3 / (c**2 * a1 * (1 - e1**2)) *
                 sqrt((G * (m1 + m2) / a1)**3)))
         if self.hexadecapole:
@@ -542,7 +544,7 @@ class TripleDelaunay:
                 e1**2 * sin(2 * g1) - 10 * th * (1 - e1**2) * (1 - th**2) *
                 cosg1 * sing2 - A * (sing1 * cosg2 - th * cosg1 * sing2))
             )
-        if self.gr:
+        if self.gr_radiation or self.gr:
             de1dt += (
                 -304 * G**3 * m1 * m2 * (m1 + m2) * e1 / (15 * c**4 * a1**4 *
                 sqrt((1 - e1**2)**5)) * (1 + 121 / 304. * e1**2)
@@ -685,7 +687,7 @@ class TripleDelaunay:
 
         # Eq. 17 of Blaes et al. (2002).
         dHdt = 0.
-        if self.gr:
+        if self.gr_radiation or self.gr:
             dHdt += (
                 -32 * G**3 * m1**2 * m2**2 /
                 (5 * c**5 * a1**3 * (1 - e1**2)**2) *
@@ -885,6 +887,8 @@ class TripleDelaunay:
         json_data['octupole'] = self.octupole
         json_data['hexadecapole'] = self.hexadecapole
         json_data['gr'] = self.gr
+        json_data['gr_precession'] = self.gr_precession
+        json_data['gr_radiation'] = self.gr_radiation
         json_data['algo'] = self.algo
         json_data['maxoutput'] = self.maxoutput
         json_data['collision'] = self.collision
