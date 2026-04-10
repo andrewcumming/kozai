@@ -34,6 +34,7 @@ class TripleDelaunay:
         m3: Mass of the tertiary in solar masses.
         r1: Radius of component 1 of the inner binary in solar radii.
         r2: Radius of component 2 of the inner binary in solar radii.
+        k2: Tidal Love number of component 2 of the inner binary.
 
     Attributes:
         tstop: The time to integrate in years.
@@ -44,7 +45,8 @@ class TripleDelaunay:
         quadrupole: Toggle the quadrupole term.
         octupole: Toggle the octupole term.
         hexadecapole: Toggle the hexadecapole term.
-        gr: Toggle GR effects.
+        gr, gr_precession, gr_radiation: Toggle GR effects, either all at once or individually
+        tidal_bulge: Toggle the precession of the inner binary due to the tidal bulge of the secondary
         algo: Set the integration algorithm (see the scipy.ode docs).
 
     """
@@ -63,6 +65,7 @@ class TripleDelaunay:
         m3=1.0,
         r1=0,
         r2=0,
+        k2=0,
     ):
 
         self._H = None
@@ -78,6 +81,7 @@ class TripleDelaunay:
         self.m3 = m3
         self.r1 = r1
         self.r2 = r2
+        self.k2 = k2
         self.inc = inc
         self.t = 0
 
@@ -91,9 +95,12 @@ class TripleDelaunay:
         self.octupole = True
         self.hexadecapole = False
         self.gr = False
+        self.gr_precession = False
+        self.gr_radiation = False
         self.algo = 'vode'
         self.maxoutput = int(1e6)
         self.collision = False
+        self.tidal_bulge = False
 
         # Store the initial state
         self.save_as_initial()
@@ -392,11 +399,12 @@ class TripleDelaunay:
         self.initial_state['m3'] = self.m3
         self.initial_state['r1'] = self.r1
         self.initial_state['r2'] = self.r2
+        self.initial_state['k2'] = self.k2
         self.initial_state['inc'] = self.inc
 
     # Integration routines
     def _deriv(self, t, y):
-        """The EOMs.  See Eqs. 11 -- 17 of Blaes et al. (2002)."""
+        """The EOMs.  See Eqs. 11 -- 17 of Blaes et al. (2002). Also adds precession of the inner binary due to the tidal bulge of the secondary, following Prodan and Murray (2012) eq. A15."""
 
         # Unpack the values.
         a1, e1, g1, e2, g2, H = y
@@ -437,7 +445,7 @@ class TripleDelaunay:
 
         # Eq. 11 of Blaes et al. (2002).
         da1dt = 0.0
-        if self.gr:
+        if self.gr_radiation or self.gr:
             da1dt += -(
                 64 * G**3 * m1 * m2 * (m1 + m2) /
                 (5 * c**5 * a1**3 * sqrt((1 - e1**2)**7)) *
@@ -461,9 +469,13 @@ class TripleDelaunay:
                 (10 * th * (1 - th**2) * (1 - 3 * e1**2) * sing1 * sing2 +
                 cosphi * (3 * A - 10 * th**2 + 2))
             )
-        if self.gr:
+        if self.gr_precession or self.gr:
             dg1dt += ((3 / (c**2 * a1 * (1 - e1**2)) *
                 sqrt((G * (m1 + m2) / a1)**3)))
+        if self.tidal_bulge:
+            # Eq. A15 of Prodan and Murray (2012)
+            dg1dt += ( (15 * sqrt(G * (m1 + m2)) / (16 * a1**(13/2))) * ((8 + 12*e1**2 + e1**4)/(1-e1**2)**5) * (m1/m2)
+                     * self.k2 * self._r2**5 )
         if self.hexadecapole:
             dg1dt += (
                 1 / (4096. * a2**5 * sqrt(1 - e1**2) * (m1 + m2)**5) * 45 *
@@ -542,7 +554,7 @@ class TripleDelaunay:
                 e1**2 * sin(2 * g1) - 10 * th * (1 - e1**2) * (1 - th**2) *
                 cosg1 * sing2 - A * (sing1 * cosg2 - th * cosg1 * sing2))
             )
-        if self.gr:
+        if self.gr_radiation or self.gr:
             de1dt += (
                 -304 * G**3 * m1 * m2 * (m1 + m2) * e1 / (15 * c**4 * a1**4 *
                 sqrt((1 - e1**2)**5)) * (1 + 121 / 304. * e1**2)
@@ -685,7 +697,7 @@ class TripleDelaunay:
 
         # Eq. 17 of Blaes et al. (2002).
         dHdt = 0.
-        if self.gr:
+        if self.gr_radiation or self.gr:
             dHdt += (
                 -32 * G**3 * m1**2 * m2**2 /
                 (5 * c**5 * a1**3 * (1 - e1**2)**2) *
@@ -885,8 +897,11 @@ class TripleDelaunay:
         json_data['octupole'] = self.octupole
         json_data['hexadecapole'] = self.hexadecapole
         json_data['gr'] = self.gr
+        json_data['gr_precession'] = self.gr_precession
+        json_data['gr_radiation'] = self.gr_radiation
         json_data['algo'] = self.algo
         json_data['maxoutput'] = self.maxoutput
         json_data['collision'] = self.collision
+        json_data['tidal_bulge'] = self.tidal_bulge
 
         return json.dumps(json_data, sort_keys=True, indent=2)
