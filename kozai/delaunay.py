@@ -48,7 +48,7 @@ class TripleDelaunay:
         gr, gr_precession, gr_radiation: Toggle GR effects, either all at once or individually
         tidal_bulge: Toggle the precession of the inner binary due to the tidal bulge of the secondary
         algo: Set the integration algorithm (see the scipy.ode docs).
-
+        tau_a: timescale (in yrs) for semi-major axis increase: da_1/dt = a_1/tau_a
     """
 
     def __init__(
@@ -101,6 +101,7 @@ class TripleDelaunay:
         self.maxoutput = int(1e6)
         self.collision = False
         self.tidal_bulge = False
+        self.tau_a = 0
 
         # Store the initial state
         self.save_as_initial()
@@ -451,6 +452,8 @@ class TripleDelaunay:
                 (5 * c**5 * a1**3 * sqrt((1 - e1**2)**7)) *
                 (1 + 73 / 24.0 * e1**2 + 37 / 96.0 * e1**4)
             )
+        if self.tau_a > 0:
+            da1dt += a1 / (self.tau_a * yr2s)
 
         # Eq. 12 of Blaes et al. (2002).
         dg1dt = 0.
